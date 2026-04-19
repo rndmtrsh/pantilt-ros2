@@ -25,6 +25,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            "test_node = pan_tilt_controller.first_node:main",
+            "draw_circle = pan_tilt_controller.draw_circle:main"
         ],
     },
 )
