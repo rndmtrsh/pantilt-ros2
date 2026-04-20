@@ -37,7 +37,7 @@ while True:
         c = max(cnts, key=cv2.contourArea)
         if cv2.contourArea(c) > 500:
             x, y, bw, bh = cv2.boundingRect(c)
-            cx = x + bw // 2
+            cx = x + bw // 2 
             cy = y + bh // 2
             err_x = cx - cx_frm
             err_y = cy_frm - cy

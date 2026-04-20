@@ -20,7 +20,7 @@ def main():
     #     print("STM32 tidak ditemukan."); sys.exit(1)
 
     ser = serial.Serial('COM21', 115200, timeout=1)
-    # print(f"Terhubung ke {port}")
+    # print(f"Terhubung ke {port}") 
     held = set()
     pan_vel = 0
     tilt_vel = 0
