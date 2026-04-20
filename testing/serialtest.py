@@ -1,69 +1,107 @@
-import sys, serial
+#!/usr/bin/env python3
+import serial
+import sys
+import threading
+import time
 from pynput import keyboard
 
-PAN_VEL = 2000
-TILT_VEL = 2000
+SERIAL_PORT = "/dev/ttyACM0"  # Ganti sesuai OS
+BAUDRATE = 115200
+PAN_VEL = 1000
+TILT_VEL = 500
 
-def find_port():
-    for i in range(3):
-        try:
-            s = serial.Serial(f"/dev/ttyACM{i}")
-            s.close()
-            return f"/dev/ttyACM{i}"
-        except (OSError, serial.SerialException):
-            pass
-    return None
+ser = None
+stop_thread = False
+
+# Track keys currently held to avoid repeat sends
+keys_held = set()
+
+def baca_serial():
+    while not stop_thread:
+        if ser and ser.in_waiting:
+            try:
+                data = ser.readline().decode(errors='ignore').strip()
+                if data:
+                    print(f"  [STM32] {data}")
+            except Exception:
+                pass
+        time.sleep(0.01)
+
+def kirim_perintah(cmd):
+    if ser and ser.is_open:
+        ser.write((cmd + '\n').encode())
+        print(f"[KIRIM] {cmd}")
+
+def saat_tekan(key):
+    global keys_held
+    try:
+        if key in keys_held:
+            return  # Ignore key repeat
+        keys_held.add(key)
+
+        if key == keyboard.Key.right:
+            kirim_perintah(f"P+{PAN_VEL}")
+        elif key == keyboard.Key.left:
+            kirim_perintah(f"P-{PAN_VEL}")
+        elif key == keyboard.Key.up:
+            kirim_perintah(f"T+{TILT_VEL}")
+        elif key == keyboard.Key.down:
+            kirim_perintah(f"T-{TILT_VEL}")
+        elif hasattr(key, 'char'):
+            if key.char == 'q':
+                return False
+            elif key.char == 's':
+                kirim_perintah("S")
+            elif key.char == '?':
+                kirim_perintah("?")
+            elif key.char == '1':
+                kirim_perintah("IP")  # Toggle pan direction
+            elif key.char == '2':
+                kirim_perintah("IT")  # Toggle tilt direction
+    except AttributeError:
+        pass
+
+def saat_lepas(key):
+    global keys_held
+    try:
+        keys_held.discard(key)
+
+        if key in (keyboard.Key.right, keyboard.Key.left):
+            kirim_perintah("P+0")
+        elif key in (keyboard.Key.up, keyboard.Key.down):
+            kirim_perintah("T+0")
+    except AttributeError:
+        pass
 
 def main():
-    # port = find_port()
-    # if not port:
-    #     print("STM32 tidak ditemukan."); sys.exit(1)
+    global ser, stop_thread
+    try:
+        ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1)
+        print(f"Terhubung ke {SERIAL_PORT}")
+    except Exception as e:
+        print(f"Gagal: {e}")
+        sys.exit(1)
 
-    ser = serial.Serial('COM21', 115200, timeout=1)
-    # print(f"Terhubung ke {port}") 
-    held = set()
-    pan_vel = 0
-    tilt_vel = 0
+    # Thread pembaca
+    thread = threading.Thread(target=baca_serial, daemon=True)
+    thread.start()
 
-    def tx(cmd):
-        ser.write((cmd + "\n").encode())
-        print(f"-> {cmd}")
+    print("=== Pan-Tilt Controller ===")
+    print("Arrow keys : Gerakkan pan/tilt")
+    print("s          : Stop semua")
+    print("1          : Toggle invert arah pan")
+    print("2          : Toggle invert arah tilt")
+    print("?          : Query status")
+    print("q          : Keluar")
+    print("===========================")
 
-    def tx_pair():
-        tx(f"P{pan_vel:+d},T{tilt_vel:+d}")
+    with keyboard.Listener(on_press=saat_tekan, on_release=saat_lepas) as listener:
+        listener.join()
 
-    def on_press(key):
-        nonlocal pan_vel, tilt_vel
-        if key in held: return
-        held.add(key)
-        if   key == keyboard.Key.right: pan_vel = +PAN_VEL
-        elif key == keyboard.Key.left:  pan_vel = -PAN_VEL
-        elif key == keyboard.Key.up:    tilt_vel = +TILT_VEL
-        elif key == keyboard.Key.down:  tilt_vel = -TILT_VEL
-        elif hasattr(key, "char") and key.char:
-            c = key.char
-            if   c == "q": return False
-            elif c == "s":
-                pan_vel = 0
-                tilt_vel = 0
-                tx("S")
-                return
-        tx_pair()
-
-    def on_release(key):
-        nonlocal pan_vel, tilt_vel
-        held.discard(key)
-        if   key in (keyboard.Key.right, keyboard.Key.left):  pan_vel = 0
-        elif key in (keyboard.Key.up, keyboard.Key.down):     tilt_vel = 0
-        else: return
-        tx_pair()
-
-    print("Arrows=pan/tilt  s=stop  q=quit")
-
-    with keyboard.Listener(on_press=on_press, on_release=on_release) as l:
-        l.join()
-
-    tx("S"); ser.close()
+    stop_thread = True
+    thread.join(timeout=1)
+    ser.close()
+    print("Selesai.")
 
 if __name__ == "__main__":
     main()

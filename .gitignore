@@ -2,5 +2,10 @@ ros2_ws/log
 ros2_ws/install
 ros2_ws/build
 
-.vscode/*
+.venv/
+.vscode/
 
+# Added by code-review-graph
+.code-review-graph/
+.claude/
+.kiro/
