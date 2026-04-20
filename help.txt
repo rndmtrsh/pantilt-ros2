@@ -1,0 +1,14 @@
+source ~/.bashrc
+
+ros2 node list
+ros2 topic list
+ros2 topic echo -topic
+ros2 ropic info -topic
+ros2 interface show -type
+
+colcon build --symlink-install
+
+
+ros2 run turtlesim turtlesim_node
+ros2 run turtlesim turtlesim_teleop
+ros2 run pan_tilt_controller first_node
