@@ -27,7 +27,8 @@ setup(
         'console_scripts': [
             "test_node = pan_tilt_controller.first_node:main",
             "draw_circle = pan_tilt_controller.draw_circle:main",
-            "pose_subscriber = pan_tilt_controller.pose_subscriber:main"
+            "pose_subscriber = pan_tilt_controller.pose_subscriber:main",
+            "turtle_controller = pan_tilt_controller.turtle_controller:main",
         ],
     },
 )
