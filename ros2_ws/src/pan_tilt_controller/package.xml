@@ -7,16 +7,26 @@
   <maintainer email="t.maulanaakmal@gmail.com">rndmtrsh</maintainer>
   <license>TODO: License declaration</license>
 
-  <depend>rclpy</depend>
+  <!-- <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
-  <depend>turtlesim_msgs</depend>
+  <depend>turtlesim_msgs</depend> -->
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>std_msgs</depend>
+  <depend>python3-serial</depend>
+  <depend>python3-opencv</depend>
+  
+  <exec_depend>ros2launch</exec_depend>
 
-  <test_depend>ament_copyright</test_depend>
+
+  <!-- <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_mypy</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>ament_xmllint</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-pytest</test_depend> -->
 
   <export>
     <build_type>ament_python</build_type>
