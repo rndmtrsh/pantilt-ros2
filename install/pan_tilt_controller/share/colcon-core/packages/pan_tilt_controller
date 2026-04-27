@@ -1,0 +1,1 @@
+cv_bridge:geometry_msgs:python3-opencv:python3-serial:rclpy:ros2launch:sensor_msgs:std_msgs

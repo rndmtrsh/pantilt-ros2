@@ -8,6 +8,10 @@ ros2 interface show -type
 
 colcon build --symlink-install
 
+colcon build --packages-select pan_tilt_controller 
+source install/setup.bash
+ros2 launch pan_tilt_controller pan_tilt.launch.py
+
 
 ros2 run turtlesim turtlesim_node
 ros2 run turtlesim turtlesim_teleop

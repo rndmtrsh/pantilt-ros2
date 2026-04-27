@@ -1,0 +1,24 @@
+[1.136s] Invoking command in '/home/akmal/Documents/finalproject/ros2_ws/src/pan_tilt_controller': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/akmal/Documents/finalproject/build/pan_tilt_controller/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/pan_tilt_controller build --build-base /home/akmal/Documents/finalproject/build/pan_tilt_controller/build install --record /home/akmal/Documents/finalproject/build/pan_tilt_controller/install.log --single-version-externally-managed install_data
+[1.508s] running egg_info
+[1.540s] writing ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/PKG-INFO
+[1.540s] writing dependency_links to ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/dependency_links.txt
+[1.540s] writing entry points to ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/entry_points.txt
+[1.540s] writing requirements to ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/requires.txt
+[1.541s] writing top-level names to ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/top_level.txt
+[1.596s] reading manifest file '../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/SOURCES.txt'
+[1.597s] writing manifest file '../../../build/pan_tilt_controller/pan_tilt_controller.egg-info/SOURCES.txt'
+[1.597s] running build
+[1.597s] running build_py
+[1.598s] running install
+[1.605s] running install_lib
+[1.633s] running install_data
+[1.634s] copying package.xml -> /home/akmal/Documents/finalproject/install/pan_tilt_controller/share/pan_tilt_controller
+[1.634s] running install_egg_info
+[1.676s] removing '/home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/python3.12/site-packages/pan_tilt_controller-0.0.1-py3.12.egg-info' (and everything under it)
+[1.677s] Copying ../../../build/pan_tilt_controller/pan_tilt_controller.egg-info to /home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/python3.12/site-packages/pan_tilt_controller-0.0.1-py3.12.egg-info
+[1.679s] running install_scripts
+[1.885s] Installing camera_vision_node script to /home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/pan_tilt_controller
+[1.885s] Installing pid_node script to /home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/pan_tilt_controller
+[1.886s] Installing serial_node script to /home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/pan_tilt_controller
+[1.886s] writing list of installed files to '/home/akmal/Documents/finalproject/build/pan_tilt_controller/install.log'
+[1.933s] Invoked command in '/home/akmal/Documents/finalproject/ros2_ws/src/pan_tilt_controller' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/akmal/Documents/finalproject/build/pan_tilt_controller/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akmal/Documents/finalproject/install/pan_tilt_controller/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/pan_tilt_controller build --build-base /home/akmal/Documents/finalproject/build/pan_tilt_controller/build install --record /home/akmal/Documents/finalproject/build/pan_tilt_controller/install.log --single-version-externally-managed install_data
