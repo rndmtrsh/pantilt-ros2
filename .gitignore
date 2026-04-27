@@ -9,3 +9,7 @@ ros2_ws/build
 .code-review-graph/
 .claude/
 .kiro/
+
+AGENTS.md
+CLAUDE.md
+GEMINI.md

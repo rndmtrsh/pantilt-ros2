@@ -34,14 +34,11 @@ class PIDNode(Node):
         self.get_logger().info('PID node started (pan direction reversed)')
 
     def error_callback(self, msg):
-        # AMBIL ERROR MENTAH, LALU BALIK TANDA UNTUK PAN (sumbu X)
         err_x_raw = msg.x
         err_y = msg.y
         confidence = msg.z
 
-        # Balik arah pan: objek di kanan (err_x positif) → motor pan bergerak KIRI (kecepatan negatif)
-        # Jika diinginkan sebaliknya, komentari baris berikut
-        err_x = -err_x_raw
+        err_x = -err_x_raw #invert X
 
         if confidence == 0.0:
             pan_vel = 0.0

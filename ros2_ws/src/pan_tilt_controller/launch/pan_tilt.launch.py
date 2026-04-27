@@ -12,7 +12,7 @@ def generate_launch_description():
                 'camera_id': 0,
                 'frame_width': 640,
                 'frame_height': 480,
-                'deadzone': 40,
+                'deadzone': 0,
                 'show_debug': True
             }],
             output='screen'
@@ -22,11 +22,11 @@ def generate_launch_description():
             executable='pid_node',
             name='pid',
             parameters=[{
-                'Kp': 0.5,
-                'Ki': 0.01,
-                'Kd': 0.1,
-                'max_vel': 2000,
-                'rate_limit': 200
+                'Kp': 3.0,
+                'Ki': 0.0,
+                'Kd': 0.0,
+                'max_vel': 5000,
+                'rate_limit': 1000
             }],
             output='screen'
         ),

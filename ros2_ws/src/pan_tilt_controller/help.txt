@@ -16,3 +16,10 @@ ros2 launch pan_tilt_controller pan_tilt.launch.py
 ros2 run turtlesim turtlesim_node
 ros2 run turtlesim turtlesim_teleop
 ros2 run pan_tilt_controller first_node
+
+ros2 param set /camera_vision deadzone 0
+ros2 param set /pid Kp 5
+ros2 param set /pid Ki 0.02
+ros2 param set /pid Kd 0.15
+ros2 param set /pid max_vel 1500
+ros2 param set /pid rate_limit 300
