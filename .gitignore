@@ -10,7 +10,13 @@ ros2_ws/build
 .claude/
 .kiro/
 
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/.mcp.json
+/.opencode.json
+build/
+log/
+.cursorrules
+.windsurfrules
 
