@@ -12,7 +12,7 @@ def generate_launch_description():
                 'camera_id': 0,
                 'frame_width': 640,
                 'frame_height': 480,
-                'deadzone': 0,
+                'deadzone': 40,
                 'show_debug': True
             }],
             output='screen'
