@@ -26,7 +26,8 @@ def generate_launch_description():
                 'Ki': 0.0,
                 'Kd': 0.0,
                 'max_vel': 5000,
-                'rate_limit': 1000
+                'rate_limit': 1000,
+                'control_rate': 20
             }],
             output='screen'
         ),
