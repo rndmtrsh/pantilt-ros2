@@ -13,7 +13,7 @@ class CameraVisionNode(Node):
         super().__init__('camera_vision_node')
 
         # Parameter
-        self.declare_parameter('camera_id', 0)
+        self.declare_parameter('camera_id', 30)
         self.declare_parameter('frame_width', 640)
         self.declare_parameter('frame_height', 480)
         self.declare_parameter('deadzone', 40)
@@ -42,6 +42,9 @@ class CameraVisionNode(Node):
         # Debug image publisher
         self.debug_pub = self.create_publisher(Image, '/camera/debug_image', 10)
         self.bridge = CvBridge()
+
+        # Allow live parameter updates from ros2 param set
+        self.add_on_set_parameters_callback(self.parameter_callback)
 
         # Open camera
         self.cap = cv2.VideoCapture(self.camera_id)
@@ -146,6 +149,16 @@ class CameraVisionNode(Node):
             cv2.imshow("Green Tracking", disp_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 rclpy.shutdown()
+
+    def parameter_callback(self, params):
+        from rcl_interfaces.msg import SetParametersResult
+
+        for param in params:
+            if param.name == 'deadzone':
+                self.deadzone = param.value
+                self.get_logger().info(f'Updated deadzone = {self.deadzone}')
+
+        return SetParametersResult(successful=True)
 
     def destroy_node(self):
         self.cap.release()

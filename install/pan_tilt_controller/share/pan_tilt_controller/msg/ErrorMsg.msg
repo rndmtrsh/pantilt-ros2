@@ -1,3 +1,1 @@
-int32 err_x
-int32 err_y
-float32 confidence
+/home/akmal/Documents/finalproject/build/pan_tilt_controller/msg/ErrorMsg.msg
