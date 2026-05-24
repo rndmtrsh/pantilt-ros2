@@ -33,7 +33,7 @@ Catatan:
 
 | Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
 |---|---|---|---|---|
-| `camera_id` | integer | `0` | `0` | Index kamera OpenCV |
+| `camera_id` | integer | `30` | `0` | Index kamera OpenCV |
 | `frame_width` | integer | `640` | `640` | Lebar frame |
 | `frame_height` | integer | `480` | `480` | Tinggi frame |
 | `deadzone` | integer | `40` | `0` | Ambang error agar dianggap nol |
@@ -44,11 +44,12 @@ Catatan:
 
 | Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
 |---|---|---|---|---|
-| `Kp` | float | `0.5` | `3.0` | Gain proporsional |
-| `Ki` | float | `0.01` | `0.0` | Gain integral |
-| `Kd` | float | `0.1` | `0.0` | Gain derivatif |
+| `Kp` | float | `0.5` | `7.0` | Gain proporsional |
+| `Ki` | float | `0.01` | `0.8` | Gain integral |
+| `Kd` | float | `0.1` | `1.5` | Gain derivatif |
 | `max_vel` | integer/float | `2000` | `5000` | Batas saturasi output |
 | `rate_limit` | integer/float | `200` | `1000` | Batas perubahan output per callback |
+| `control_rate` | integer/float | `20` | `20` | Frekuensi loop kontrol (Hz) |
 
 ### 3.3 `/serial`
 
@@ -181,6 +182,8 @@ ros2 interface show geometry_msgs/msg/Vector3
 ## 10) Catatan Implementasi Penting
 
 - Node PID melakukan pembalikan arah pan (`err_x = -err_x_raw`) agar arah gerak sesuai mekanik.
+- Ketika `confidence` = `0.0`, node PID mengirim `pan_vel`/`tilt_vel` = `0.0`.
 - Anti-windup sederhana diterapkan saat output menyentuh batas saturasi.
 - Parameter pada launch override default parameter di kode.
 - `deadzone` yang kecil membuat sistem lebih responsif tetapi bisa menambah jitter.
+- `control_rate` menentukan periode timer PID (dt = 1 / control_rate).
