@@ -146,9 +146,9 @@ flowchart LR
     CV -->|/vision/error\ngeometry_msgs/Vector3| PID[pid node]
     PID -->|/cmd_vel\ngeometry_msgs/Twist| SER[serial node]
     SER --> MCU[STM32/Arduino via UART]
-    CV --> LOG[metrics_logger (optional)]
+    CV --> LOG["metrics_logger optional"]
     PID --> LOG
-    LAT[/detection/latency (optional)] --> LOG
+    LAT["/detection/latency optional"] --> LOG
 ```
 
 Penjelasan alur:
