@@ -26,37 +26,45 @@ def _extract_series(rows):
         return None
 
     fields = rows[0].keys()
-    source_filter = None
-    if 'source' in fields:
-        source_filter = 'vision'
+    has_source = 'source' in fields
 
     t_values = []
     err_x_values = []
     err_y_values = []
     conf_values = []
     latency_values = []
+    latency_fallback_values = []
     capture_values = []
     publish_values = []
 
     for row in rows:
-        if source_filter and row.get('source') != source_filter:
-            continue
-        t_values.append(_to_float(row.get('t_sec')))
-        err_x_values.append(_to_float(row.get('err_x')))
-        err_y_values.append(_to_float(row.get('err_y')))
-        conf_values.append(_to_float(row.get('confidence')))
-        if 'latency_ms' in row:
+        source = row.get('source') if has_source else 'vision'
+
+        if source == 'vision':
+            t_values.append(_to_float(row.get('t_sec')))
+            err_x_values.append(_to_float(row.get('err_x')))
+            err_y_values.append(_to_float(row.get('err_y')))
+            conf_values.append(_to_float(row.get('confidence')))
+            if 'capture_time_sec' in row:
+                capture_values.append(_to_float(row.get('capture_time_sec')))
+            if 'error_publish_time_sec' in row:
+                publish_values.append(_to_float(row.get('error_publish_time_sec')))
+            if 'latency_ms' in row:
+                latency_fallback_values.append(_to_float(row.get('latency_ms')))
+
+        if source == 'latency' and 'latency_ms' in row:
             latency_values.append(_to_float(row.get('latency_ms')))
-        if 'capture_time_sec' in row:
-            capture_values.append(_to_float(row.get('capture_time_sec')))
-        if 'error_publish_time_sec' in row:
-            publish_values.append(_to_float(row.get('error_publish_time_sec')))
 
     t = np.array(t_values, dtype=float)
     err_x = np.array(err_x_values, dtype=float)
     err_y = np.array(err_y_values, dtype=float)
     conf = np.array(conf_values, dtype=float)
-    latency = np.array(latency_values, dtype=float) if latency_values else None
+    if latency_values:
+        latency = np.array(latency_values, dtype=float)
+    elif latency_fallback_values:
+        latency = np.array(latency_fallback_values, dtype=float)
+    else:
+        latency = None
     capture = np.array(capture_values, dtype=float) if capture_values else None
     publish = np.array(publish_values, dtype=float) if publish_values else None
 

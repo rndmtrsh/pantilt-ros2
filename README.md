@@ -69,7 +69,7 @@ Catatan: model YOLO `best.pt` dibaca dari folder paket, dan target class `Human-
 | `test_id` | string | `run` | `dist1p5_bright` | ID sesi untuk nama file |
 | `distance` | float | `0.0` | `1.5` | Jarak pengujian (meter) |
 | `light_condition` | string | `unknown` | `bright` | Kondisi cahaya |
-| `output_dir` | string | `~/metrics_logs` | `/home/akmal/Documents/finalproject/metrics_logs` | Folder output CSV |
+| `output_dir` | string | `~/metrics_logs` | `~/metrics_logs` | Folder output CSV |
 | `queue_size` | integer | `10000` | tidak di-set (pakai default) | Ukuran antrean internal |
 | `flush_interval_sec` | float | `0.5` | tidak di-set (pakai default) | Interval flush file |
 | `latency_topic` | string | `/detection/latency` | `/latency/control_serial` | Topic latency (opsional) |
