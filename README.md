@@ -9,7 +9,7 @@ Sistem ini adalah pipeline kontrol pan-tilt berbasis ROS 2 untuk melakukan track
 Alur utama:
 1. Node visi membaca frame kamera, menjalankan YOLO untuk target `Human-body`, lalu menghitung error posisi target terhadap pusat frame.
 2. Node PID mengubah error posisi menjadi perintah kecepatan pan/tilt.
-3. Node serial mengirim perintah tersebut ke mikrokontroler (mis. STM32/Arduino) via UART.
+3. Node serial mengirim perintah tersebut ke mikrokontroler (mis. STM32/ESP32) via UART.
 4. (Opsional) Node `metrics_logger` mencatat `/vision/error`, `/cmd_vel`, dan latency ke file CSV.
 
 Tujuan kontrol: menjaga target tetap dekat titik tengah frame kamera.
@@ -145,7 +145,7 @@ flowchart LR
     CAM[Camera / OpenCV Capture] --> CV[camera_vision node]
     CV -->|/vision/error\ngeometry_msgs/Vector3| PID[pid node]
     PID -->|/cmd_vel\ngeometry_msgs/Twist| SER[serial node]
-    SER --> MCU[STM32/Arduino via UART]
+    SER --> MCU[STM32 via UART]
     CV --> LOG["metrics_logger optional"]
     PID --> LOG
     LAT["/detection/latency optional"] --> LOG
