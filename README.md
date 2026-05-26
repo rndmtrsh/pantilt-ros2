@@ -4,12 +4,13 @@ Dokumentasi ini merangkum struktur sistem `pan_tilt_controller` secara ringkas d
 
 ## 1) Deskripsi Sistem
 
-Sistem ini adalah pipeline kontrol pan-tilt berbasis ROS 2 untuk melakukan tracking objek berwarna hijau dari kamera lalu menggerakkan aktuator pan/tilt melalui serial.
+Sistem ini adalah pipeline kontrol pan-tilt berbasis ROS 2 untuk melakukan tracking manusia menggunakan model YOLO (`best.pt`, class `Human-body`) dari kamera lalu menggerakkan aktuator pan/tilt melalui serial.
 
 Alur utama:
-1. Node visi membaca frame kamera dan menghitung error posisi target terhadap pusat frame.
+1. Node visi membaca frame kamera, menjalankan YOLO untuk target `Human-body`, lalu menghitung error posisi target terhadap pusat frame.
 2. Node PID mengubah error posisi menjadi perintah kecepatan pan/tilt.
 3. Node serial mengirim perintah tersebut ke mikrokontroler (mis. STM32/Arduino) via UART.
+4. (Opsional) Node `metrics_logger` mencatat `/vision/error`, `/cmd_vel`, dan latency ke file CSV.
 
 Tujuan kontrol: menjaga target tetap dekat titik tengah frame kamera.
 
@@ -19,13 +20,14 @@ Node yang dijalankan dari launch file `launch/pan_tilt.launch.py`:
 
 | Node Name (runtime) | Executable | Peran |
 |---|---|---|
-| `/camera_vision` | `camera_vision_node` | Deteksi objek hijau, hitung error X/Y, publish debug image |
+| `/camera_vision` | `camera_vision_node` | Deteksi manusia (YOLO), hitung error X/Y, tampilkan window debug OpenCV |
 | `/pid` | `pid_node` | Hitung kontrol PID dari error visi menjadi `cmd_vel` |
 | `/serial` | `serial_node` | Kirim `cmd_vel` ke perangkat melalui serial |
+| `/metrics_logger` | `metrics_logger` | Logging CSV untuk `/vision/error`, `/cmd_vel`, dan latency (opsional) |
 
 Catatan:
 - Nama runtime di atas berasal dari `name=` pada launch file.
-- Nama internal class/node pada source adalah `camera_vision_node`, `pid_node`, `serial_node`.
+- Nama class pada source adalah `CameraVisionNode`, `PIDNode`, `SerialNode`, `MetricsLogger`.
 
 ## 3) Parameter List
 
@@ -37,8 +39,10 @@ Catatan:
 | `frame_width` | integer | `640` | `640` | Lebar frame |
 | `frame_height` | integer | `480` | `480` | Tinggi frame |
 | `deadzone` | integer | `40` | `0` | Ambang error agar dianggap nol |
-| `show_debug` | boolean | `false` | `true` | Tampilkan window debug + overlay |
-| `flip_horizontal` | boolean | `true` | tidak di-set | Mirror frame horizontal |
+| `show_debug` | boolean | `false` | `true` | Tampilkan window debug OpenCV (bukan topic) |
+| `flip_horizontal` | boolean | `true` | tidak di-set (pakai default) | Mirror frame horizontal |
+
+Catatan: model YOLO `best.pt` dibaca dari folder paket, dan target class `Human-body` bersifat hardcoded.
 
 ### 3.2 `/pid`
 
@@ -58,15 +62,31 @@ Catatan:
 | `port` | string | `/dev/ttyACM0` | `/dev/ttyACM0` | Port serial perangkat |
 | `baudrate` | integer | `115200` | `115200` | Kecepatan UART |
 
+### 3.4 `/metrics_logger` (opsional)
+
+| Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
+|---|---|---|---|---|
+| `test_id` | string | `run` | `dist1p5_bright` | ID sesi untuk nama file |
+| `distance` | float | `0.0` | `1.5` | Jarak pengujian (meter) |
+| `light_condition` | string | `unknown` | `bright` | Kondisi cahaya |
+| `output_dir` | string | `~/metrics_logs` | `~/metrics_logs` | Folder output CSV |
+| `queue_size` | integer | `10000` | tidak di-set (pakai default) | Ukuran antrean internal |
+| `flush_interval_sec` | float | `0.5` | tidak di-set (pakai default) | Interval flush file |
+| `latency_topic` | string | `/detection/latency` | tidak di-set (pakai default) | Topic latency (opsional) |
+| `latency_msg_type` | string | "" | "" | Tipe pesan ROS untuk latency (jika kosong, tidak subscribe) |
+| `latency_field` | string | `data` | tidak di-set (pakai default) | Nama field nilai latency |
+
 ## 4) Topic List
 
 Topic utama sistem:
 
 | Topic | Type | Publisher | Subscriber | Fungsi |
 |---|---|---|---|---|
-| `/vision/error` | `geometry_msgs/msg/Vector3` | `/camera_vision` | `/pid` | Error tracking (`x=err_x`, `y=err_y`, `z=confidence`) |
-| `/camera/debug_image` | `sensor_msgs/msg/Image` | `/camera_vision` | Tool visualisasi (opsional) | Frame debug dengan overlay |
-| `/cmd_vel` | `geometry_msgs/msg/Twist` | `/pid` | `/serial` | Perintah kecepatan pan/tilt |
+| `/vision/error` | `geometry_msgs/msg/Vector3` | `/camera_vision` | `/pid`, `/metrics_logger` | Error tracking (`x=err_x`, `y=err_y`, `z=confidence`) |
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | `/pid` | `/serial`, `/metrics_logger` | Perintah kecepatan pan/tilt |
+| `/detection/latency` (opsional) | (tergantung `latency_msg_type`) | Publisher eksternal | `/metrics_logger` | Latency inference/deteksi (jika diset) |
+
+Catatan: tampilan debug hanya berupa window OpenCV lokal.
 
 Topic standar ROS 2 yang juga ada saat node aktif:
 - `/parameter_events`
@@ -88,7 +108,7 @@ float64 z
 Pemaknaan di sistem ini:
 - `x`: error horizontal (pixel)
 - `y`: error vertikal (pixel)
-- `z`: confidence deteksi (`0.0` atau `1.0`)
+- `z`: confidence deteksi YOLO (`0.0` jika tidak ada deteksi)
 
 #### `geometry_msgs/msg/Twist`
 Digunakan pada `/cmd_vel`.
@@ -103,8 +123,8 @@ Pemaknaan di sistem ini:
 - `linear.y`: `tilt_vel`
 - Field lain tidak digunakan.
 
-#### `sensor_msgs/msg/Image`
-Digunakan pada `/camera/debug_image` untuk debug visual hasil tracking.
+#### Latency topic (opsional)
+Tipe pesan latency ditentukan oleh parameter `latency_msg_type` (contoh: `std_msgs/msg/Float32`), dan nilai diambil dari field `latency_field` (default: `data`).
 
 ### 5.2 Interface custom dalam paket
 
@@ -125,15 +145,18 @@ flowchart LR
     CAM[Camera / OpenCV Capture] --> CV[camera_vision node]
     CV -->|/vision/error\ngeometry_msgs/Vector3| PID[pid node]
     PID -->|/cmd_vel\ngeometry_msgs/Twist| SER[serial node]
-    CV -->|/camera/debug_image\nsensor_msgs/Image| DBG[RViz/rqt_image_view/Subscriber]
     SER --> MCU[STM32/Arduino via UART]
+    CV --> LOG[metrics_logger (optional)]
+    PID --> LOG
+    LAT[/detection/latency (optional)] --> LOG
 ```
 
 Penjelasan alur:
-1. `camera_vision` membaca frame, segmentasi warna hijau, memilih kontur terbesar, lalu menghitung error terhadap pusat frame.
+1. `camera_vision` membaca frame, menjalankan YOLO `best.pt` untuk class `Human-body`, lalu menghitung error terhadap pusat frame.
 2. Error dipublish ke `/vision/error` sebagai `Vector3`.
 3. `pid` menerima error, melakukan pembalikan sumbu pan (`err_x` dibalik), kontrol PID + saturasi + rate limit, lalu publish `/cmd_vel`.
 4. `serial` menerima `/cmd_vel` dan mengirim string perintah format `P{pan},T{tilt}\n` ke mikrokontroler.
+5. (Opsional) `metrics_logger` mencatat `/vision/error`, `/cmd_vel`, dan latency ke CSV.
 
 ## 7) Interface ke Hardware (Serial)
 
@@ -161,6 +184,10 @@ Dari `package.xml`, dependensi utama:
 - `python3-opencv`
 - `ros2launch` (exec depend)
 
+Tambahan Python (pip) untuk node YOLO:
+- `ultralytics`
+- `numpy`
+
 ## 9) Menjalankan Sistem
 
 ```bash
@@ -169,6 +196,14 @@ colcon build --packages-select pan_tilt_controller --symlink-install
 source install/setup.bash
 ros2 launch pan_tilt_controller pan_tilt.launch.py
 ```
+
+Aktifkan logger dan window debug:
+
+```bash
+ros2 launch pan_tilt_controller pan_tilt.launch.py enable_logger:=true show_debug:=true
+```
+
+Pastikan file model `best.pt` tersedia di folder paket.
 
 Cek cepat runtime:
 
@@ -181,9 +216,12 @@ ros2 interface show geometry_msgs/msg/Vector3
 
 ## 10) Catatan Implementasi Penting
 
+- Node vision memakai model YOLO `best.pt` dengan class target `Human-body` (hardcoded).
 - Node PID melakukan pembalikan arah pan (`err_x = -err_x_raw`) agar arah gerak sesuai mekanik.
 - Ketika `confidence` = `0.0`, node PID mengirim `pan_vel`/`tilt_vel` = `0.0`.
+- `show_debug` hanya membuka window OpenCV lokal; tidak ada topic image.
 - Anti-windup sederhana diterapkan saat output menyentuh batas saturasi.
 - Parameter pada launch override default parameter di kode.
 - `deadzone` yang kecil membuat sistem lebih responsif tetapi bisa menambah jitter.
 - `control_rate` menentukan periode timer PID (dt = 1 / control_rate).
+- `metrics_logger` menulis CSV ke `output_dir` dan bisa merekam latency jika `latency_msg_type` diset.
