@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, Vector3
+from geometry_msgs.msg import Twist, Vector3Stamped
 import time
 
 
@@ -36,8 +36,8 @@ class PIDNode(Node):
         self.current_err_y = 0.0
         self.confidence = 0.0
 
-        # Subscribe to Vector3 (x=err_x, y=err_y, z=confidence)
-        self.error_sub = self.create_subscription(Vector3, '/vision/error', self.error_callback, 10)
+        # Subscribe to Vector3Stamped (vector.x=err_x, vector.y=err_y, vector.z=confidence)
+        self.error_sub = self.create_subscription(Vector3Stamped, '/vision/error', self.error_callback, 10)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
         # Create timer untuk control loop
@@ -50,9 +50,9 @@ class PIDNode(Node):
 
     def error_callback(self, msg):
         """Simpan error terbaru dari vision node"""
-        self.current_err_x = -msg.x  # invert X
-        self.current_err_y = msg.y
-        self.confidence = msg.z
+        self.current_err_x = -msg.vector.x  # invert X
+        self.current_err_y = msg.vector.y
+        self.confidence = msg.vector.z
 
     def control_loop(self):
         """Control loop utama dengan delta time yang terdefinisi"""

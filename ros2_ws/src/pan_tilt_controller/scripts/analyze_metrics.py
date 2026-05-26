@@ -35,6 +35,8 @@ def _extract_series(rows):
     err_y_values = []
     conf_values = []
     latency_values = []
+    capture_values = []
+    publish_values = []
 
     for row in rows:
         if source_filter and row.get('source') != source_filter:
@@ -45,14 +47,20 @@ def _extract_series(rows):
         conf_values.append(_to_float(row.get('confidence')))
         if 'latency_ms' in row:
             latency_values.append(_to_float(row.get('latency_ms')))
+        if 'capture_time_sec' in row:
+            capture_values.append(_to_float(row.get('capture_time_sec')))
+        if 'error_publish_time_sec' in row:
+            publish_values.append(_to_float(row.get('error_publish_time_sec')))
 
     t = np.array(t_values, dtype=float)
     err_x = np.array(err_x_values, dtype=float)
     err_y = np.array(err_y_values, dtype=float)
     conf = np.array(conf_values, dtype=float)
     latency = np.array(latency_values, dtype=float) if latency_values else None
+    capture = np.array(capture_values, dtype=float) if capture_values else None
+    publish = np.array(publish_values, dtype=float) if publish_values else None
 
-    return t, err_x, err_y, conf, latency
+    return t, err_x, err_y, conf, latency, capture, publish
 
 
 def _rms_error(t, err_x, err_y, steady_state_sec):
@@ -172,13 +180,25 @@ def _latency_stats(latency):
     return float(np.mean(values)), float(np.std(values))
 
 
+def _vision_latency_stats(capture, publish):
+    if capture is None or publish is None:
+        return math.nan, math.nan
+
+    mask = np.isfinite(capture) & np.isfinite(publish)
+    if not np.any(mask):
+        return math.nan, math.nan
+
+    latency_ms = (publish[mask] - capture[mask]) * 1e3
+    return float(np.mean(latency_ms)), float(np.std(latency_ms))
+
+
 def analyze_file(csv_path, args):
     rows = _load_rows(csv_path)
     series = _extract_series(rows)
     if series is None:
         return None
 
-    t, err_x, err_y, conf, latency = series
+    t, err_x, err_y, conf, latency, capture, publish = series
 
     rms_error = _rms_error(t, err_x, err_y, args.steady_state_sec)
     settling_time = _settling_time(
@@ -193,6 +213,7 @@ def analyze_file(csv_path, args):
     mean_conf = _mean_confidence(conf)
     loss_rate, loss_events = _loss_of_lock_per_minute(t, conf, args.lock_threshold, args.lock_min_duration)
     latency_mean, latency_std = _latency_stats(latency)
+    vision_latency_mean, vision_latency_std = _vision_latency_stats(capture, publish)
 
     return {
         'file': csv_path.name,
@@ -203,6 +224,8 @@ def analyze_file(csv_path, args):
         'loss_of_lock_events': loss_events,
         'latency_mean_ms': latency_mean,
         'latency_std_ms': latency_std,
+        'vision_latency_mean_ms': vision_latency_mean,
+        'vision_latency_std_ms': vision_latency_std,
     }
 
 
@@ -244,6 +267,8 @@ def main():
         'loss_of_lock_events',
         'latency_mean_ms',
         'latency_std_ms',
+        'vision_latency_mean_ms',
+        'vision_latency_std_ms',
     ]
 
     print(','.join(header))

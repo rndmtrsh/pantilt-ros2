@@ -3,7 +3,7 @@ from pathlib import Path
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3Stamped
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -41,8 +41,8 @@ class CameraVisionNode(Node):
         self.model = None
         self.target_class_id = None
 
-        # Publisher for error (Vector3: x=err_x, y=err_y, z=confidence)
-        self.error_pub = self.create_publisher(Vector3, '/vision/error', 10)
+        # Publisher for error (Vector3Stamped: vector.x=err_x, vector.y=err_y, vector.z=confidence)
+        self.error_pub = self.create_publisher(Vector3Stamped, '/vision/error', 10)
 
         # Allow live parameter updates from ros2 param set
         self.add_on_set_parameters_callback(self.parameter_callback)
@@ -75,6 +75,8 @@ class CameraVisionNode(Node):
         if not ret:
             self.get_logger().warn('Failed to grab frame')
             return
+
+        capture_time = self.get_clock().now()
 
         if self.flip_horizontal:
             frame = cv2.flip(frame, 1)
@@ -144,10 +146,11 @@ class CameraVisionNode(Node):
                            (255, 0, 0), cv2.MARKER_CROSS, 20, 2)
 
         # Publish error (Vector3)
-        msg_vec = Vector3()
-        msg_vec.x = float(err_x_pub)
-        msg_vec.y = float(err_y_pub)
-        msg_vec.z = confidence
+        msg_vec = Vector3Stamped()
+        msg_vec.header.stamp = capture_time.to_msg()
+        msg_vec.vector.x = float(err_x_pub)
+        msg_vec.vector.y = float(err_y_pub)
+        msg_vec.vector.z = confidence
         self.error_pub.publish(msg_vec)
 
         if self.show_debug:

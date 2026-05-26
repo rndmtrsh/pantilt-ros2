@@ -38,10 +38,12 @@ def count_false_positives(bag_path, topic, threshold, storage_id):
         if topic_name != topic:
             continue
         msg = deserialize_message(data, msg_cls)
-        if not hasattr(msg, 'z'):
+        if hasattr(msg, 'vector'):
+            confidence = float(msg.vector.z)
+        elif hasattr(msg, 'z'):
+            confidence = float(msg.z)
+        else:
             raise RuntimeError('Message does not have a z field for confidence')
-
-        confidence = float(msg.z)
         if first_time is None:
             first_time = timestamp
         last_time = timestamp

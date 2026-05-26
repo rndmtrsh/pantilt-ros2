@@ -9,7 +9,7 @@ from queue import Empty, Full, Queue
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Vector3, Twist
+from geometry_msgs.msg import Vector3Stamped, Twist
 
 
 class MetricsLogger(Node):
@@ -55,6 +55,8 @@ class MetricsLogger(Node):
         self._header = [
             't_sec',
             'source',
+            'capture_time_sec',
+            'error_publish_time_sec',
             'err_x',
             'err_y',
             'confidence',
@@ -74,7 +76,7 @@ class MetricsLogger(Node):
         self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
         self._writer_thread.start()
 
-        self.create_subscription(Vector3, '/vision/error', self._error_cb, 50)
+        self.create_subscription(Vector3Stamped, '/vision/error', self._error_cb, 50)
         self.create_subscription(Twist, '/cmd_vel', self._cmd_cb, 50)
         self._setup_latency_subscription()
 
@@ -100,9 +102,18 @@ class MetricsLogger(Node):
         elapsed = self.get_clock().now() - self.start_time
         return elapsed.nanoseconds / 1e9
 
+    def _now_sec(self):
+        return self.get_clock().now().nanoseconds / 1e9
+
+    def _stamp_to_sec(self, stamp):
+        return float(stamp.sec) + float(stamp.nanosec) / 1e9
+
     def _error_cb(self, msg):
         self.last_error = msg
-        self._enqueue_row('vision', msg, self.last_cmd, self.last_latency_ms)
+        capture_time_sec = self._stamp_to_sec(msg.header.stamp)
+        publish_time_sec = self._now_sec()
+        self._enqueue_row('vision', msg, self.last_cmd, self.last_latency_ms,
+                          capture_time_sec, publish_time_sec)
 
     def _cmd_cb(self, msg):
         self.last_cmd = msg
@@ -132,10 +143,11 @@ class MetricsLogger(Node):
 
         self._enqueue_row('latency', self.last_error, self.last_cmd, self.last_latency_ms)
 
-    def _enqueue_row(self, source, err_msg, cmd_msg, latency_ms):
-        err_x = float(err_msg.x) if err_msg is not None else math.nan
-        err_y = float(err_msg.y) if err_msg is not None else math.nan
-        confidence = float(err_msg.z) if err_msg is not None else math.nan
+    def _enqueue_row(self, source, err_msg, cmd_msg, latency_ms,
+                     capture_time_sec=math.nan, publish_time_sec=math.nan):
+        err_x = float(err_msg.vector.x) if err_msg is not None else math.nan
+        err_y = float(err_msg.vector.y) if err_msg is not None else math.nan
+        confidence = float(err_msg.vector.z) if err_msg is not None else math.nan
 
         cmd_x = float(cmd_msg.linear.x) if cmd_msg is not None else math.nan
         cmd_y = float(cmd_msg.linear.y) if cmd_msg is not None else math.nan
@@ -144,6 +156,8 @@ class MetricsLogger(Node):
         row = [
             self._elapsed_sec(),
             source,
+            float(capture_time_sec) if capture_time_sec is not None else math.nan,
+            float(publish_time_sec) if publish_time_sec is not None else math.nan,
             err_x,
             err_y,
             confidence,

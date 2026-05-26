@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Vector3Stamped
+from std_msgs.msg import Float32
 import serial # type: ignore
 import time
 
@@ -26,9 +27,16 @@ class SerialNode(Node):
             self.get_logger().error(f'Failed to open serial port: {e}')
             raise
 
-        # Subscriber
+        self.last_error_recv_time = None
+
+        # Subscribers
+        self.error_sub = self.create_subscription(Vector3Stamped, '/vision/error', self._error_cb, 10)
         self.cmd_sub = self.create_subscription(Twist, '/cmd_vel', self.cmd_callback, 10)
+        self.latency_pub = self.create_publisher(Float32, '/latency/control_serial', 10)
         self.get_logger().info('Serial node started')
+
+    def _error_cb(self, msg):
+        self.last_error_recv_time = self.get_clock().now()
 
     def cmd_callback(self, msg):
         pan_vel = int(msg.linear.x)
@@ -42,6 +50,13 @@ class SerialNode(Node):
             self.ser.write(cmd_str.encode())
         except serial.SerialException as e:
             self.get_logger().error(f'Serial write error: {e}')
+
+        if self.last_error_recv_time is not None:
+            now = self.get_clock().now()
+            latency_ms = (now - self.last_error_recv_time).nanoseconds / 1e6
+            latency_msg = Float32()
+            latency_msg.data = float(latency_ms)
+            self.latency_pub.publish(latency_msg)
 
         # Optionally read response (if STM32 replies)
         # if self.ser.in_waiting > 0:

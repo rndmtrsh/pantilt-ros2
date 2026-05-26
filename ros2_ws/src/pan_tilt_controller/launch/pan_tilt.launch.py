@@ -13,7 +13,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'enable_logger',
-            default_value='false',
+            default_value='true',
             description='Enable metrics_logger node'
         ),
         DeclareLaunchArgument(
@@ -43,7 +43,9 @@ def generate_launch_description():
                 'distance': 1.5,
                 'light_condition': 'bright',
                 'output_dir': '/home/akmal/Documents/finalproject/metrics_logs',
-                'latency_msg_type': ''
+                    'latency_topic': '/latency/control_serial',
+                    'latency_msg_type': 'std_msgs/msg/Float32',
+                    'latency_field': 'data'
             }],
             condition=IfCondition(enable_logger),
             output='screen'
