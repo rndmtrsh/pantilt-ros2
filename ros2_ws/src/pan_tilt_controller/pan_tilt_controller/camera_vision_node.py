@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
+from pathlib import Path
+
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 from geometry_msgs.msg import Vector3
-from pathlib import Path
 import cv2
 import numpy as np
 from ultralytics import YOLO
+
+
+def _to_numpy(value):
+    if hasattr(value, 'detach'):
+        return value.detach().cpu().numpy()
+    return np.asarray(value)
 
 
 class CameraVisionNode(Node):
@@ -38,10 +43,6 @@ class CameraVisionNode(Node):
 
         # Publisher for error (Vector3: x=err_x, y=err_y, z=confidence)
         self.error_pub = self.create_publisher(Vector3, '/vision/error', 10)
-
-        # Debug image publisher
-        self.debug_pub = self.create_publisher(Image, '/camera/debug_image', 10)
-        self.bridge = CvBridge()
 
         # Allow live parameter updates from ros2 param set
         self.add_on_set_parameters_callback(self.parameter_callback)
@@ -94,24 +95,11 @@ class CameraVisionNode(Node):
         target_boxes = np.empty((0, 4), dtype=float)
         target_conf = None
         if boxes is not None and len(boxes) > 0:
-            boxes_xyxy = boxes.xyxy
-            boxes_cls = boxes.cls
+            boxes_xyxy = _to_numpy(boxes.xyxy)
+            boxes_cls = _to_numpy(boxes.cls).reshape(-1).astype(int)
             boxes_conf = getattr(boxes, 'conf', None)
-            if hasattr(boxes_xyxy, 'detach'):
-                boxes_xyxy = boxes_xyxy.detach().cpu().numpy()
-            else:
-                boxes_xyxy = np.asarray(boxes_xyxy)
-            if hasattr(boxes_cls, 'detach'):
-                boxes_cls = boxes_cls.detach().cpu().numpy()
-            else:
-                boxes_cls = np.asarray(boxes_cls)
-            boxes_cls = boxes_cls.reshape(-1).astype(int)
             if boxes_conf is not None:
-                if hasattr(boxes_conf, 'detach'):
-                    boxes_conf = boxes_conf.detach().cpu().numpy()
-                else:
-                    boxes_conf = np.asarray(boxes_conf)
-                boxes_conf = boxes_conf.reshape(-1)
+                boxes_conf = _to_numpy(boxes_conf).reshape(-1)
 
             if boxes_xyxy.size > 0:
                 mask = boxes_cls == self.target_class_id
@@ -119,7 +107,7 @@ class CameraVisionNode(Node):
                 if boxes_conf is not None:
                     target_conf = boxes_conf[mask]
 
-        publish_debug = self.show_debug or self.debug_pub.get_subscription_count() > 0
+        publish_debug = self.show_debug
         disp_frame = frame.copy() if publish_debug else None
 
         if target_boxes.size > 0:
@@ -154,8 +142,6 @@ class CameraVisionNode(Node):
         if publish_debug:
             cv2.drawMarker(disp_frame, (self.frame_center_x, self.frame_center_y),
                            (255, 0, 0), cv2.MARKER_CROSS, 20, 2)
-            debug_msg = self.bridge.cv2_to_imgmsg(disp_frame, encoding='bgr8')
-            self.debug_pub.publish(debug_msg)
 
         # Publish error (Vector3)
         msg_vec = Vector3()

@@ -1,6 +1,7 @@
 ros2_ws/log
 ros2_ws/install
 ros2_ws/build
+metrics_logs
 
 .venv/
 .vscode/
@@ -8,15 +9,19 @@ ros2_ws/build
 # Added by code-review-graph
 .code-review-graph/
 .claude/
-.kiro/
+.kiro/ 
 
 /AGENTS.md
 /CLAUDE.md
 /GEMINI.md
+/QODER.md
 /.mcp.json
 /.opencode.json
 build/
 log/
 .cursorrules
 .windsurfrules
+.gemini
+.qoder
+.github
 

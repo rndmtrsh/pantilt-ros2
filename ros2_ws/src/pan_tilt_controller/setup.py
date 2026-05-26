@@ -36,6 +36,7 @@ setup(
             "camera_vision_node = pan_tilt_controller.camera_vision_node:main",
             "pid_node = pan_tilt_controller.pid_node:main",
             "serial_node = pan_tilt_controller.serial_node:main",
+            "metrics_logger = pan_tilt_controller.metrics_logger:main",
         ],
     },
 )
