@@ -69,11 +69,11 @@ Catatan: model YOLO `best.pt` dibaca dari folder paket, dan target class `Human-
 | `test_id` | string | `run` | `dist1p5_bright` | ID sesi untuk nama file |
 | `distance` | float | `0.0` | `1.5` | Jarak pengujian (meter) |
 | `light_condition` | string | `unknown` | `bright` | Kondisi cahaya |
-| `output_dir` | string | `~/metrics_logs` | `~/metrics_logs` | Folder output CSV |
+| `output_dir` | string | `~/metrics_logs` | `/home/akmal/Documents/finalproject/metrics_logs` | Folder output CSV |
 | `queue_size` | integer | `10000` | tidak di-set (pakai default) | Ukuran antrean internal |
 | `flush_interval_sec` | float | `0.5` | tidak di-set (pakai default) | Interval flush file |
-| `latency_topic` | string | `/detection/latency` | tidak di-set (pakai default) | Topic latency (opsional) |
-| `latency_msg_type` | string | "" | "" | Tipe pesan ROS untuk latency (jika kosong, tidak subscribe) |
+| `latency_topic` | string | `/detection/latency` | `/latency/control_serial` | Topic latency (opsional) |
+| `latency_msg_type` | string | "" | `std_msgs/msg/Float32` | Tipe pesan ROS untuk latency (jika kosong, tidak subscribe) |
 | `latency_field` | string | `data` | tidak di-set (pakai default) | Nama field nilai latency |
 
 ## 4) Topic List
@@ -82,9 +82,10 @@ Topic utama sistem:
 
 | Topic | Type | Publisher | Subscriber | Fungsi |
 |---|---|---|---|---|
-| `/vision/error` | `geometry_msgs/msg/Vector3` | `/camera_vision` | `/pid`, `/metrics_logger` | Error tracking (`x=err_x`, `y=err_y`, `z=confidence`) |
+| `/vision/error` | `geometry_msgs/msg/Vector3Stamped` | `/camera_vision` | `/pid`, `/metrics_logger` | Error tracking (`vector.x=err_x`, `vector.y=err_y`, `vector.z=confidence`) + timestamp capture |
 | `/cmd_vel` | `geometry_msgs/msg/Twist` | `/pid` | `/serial`, `/metrics_logger` | Perintah kecepatan pan/tilt |
-| `/detection/latency` (opsional) | (tergantung `latency_msg_type`) | Publisher eksternal | `/metrics_logger` | Latency inference/deteksi (jika diset) |
+| `/latency/control_serial` | `std_msgs/msg/Float32` | `/serial` | `/metrics_logger` | Latency error-receive -> serial write |
+| `/detection/latency` (opsional) | (tergantung `latency_msg_type`) | Publisher eksternal | `/metrics_logger` | Latency eksternal lain (jika override parameter logger) |
 
 Catatan: tampilan debug hanya berupa window OpenCV lokal.
 
@@ -96,19 +97,29 @@ Topic standar ROS 2 yang juga ada saat node aktif:
 
 ### 5.1 Interface yang dipakai runtime
 
-#### `geometry_msgs/msg/Vector3`
+#### `geometry_msgs/msg/Vector3Stamped`
 Digunakan pada `/vision/error`.
 
 ```text
-float64 x
-float64 y
-float64 z
+std_msgs/Header header
+geometry_msgs/Vector3 vector
 ```
 
 Pemaknaan di sistem ini:
-- `x`: error horizontal (pixel)
-- `y`: error vertikal (pixel)
-- `z`: confidence deteksi YOLO (`0.0` jika tidak ada deteksi)
+- `header.stamp`: timestamp capture frame (untuk vision latency)
+- `vector.x`: error horizontal (pixel)
+- `vector.y`: error vertikal (pixel)
+- `vector.z`: confidence deteksi YOLO (`0.0` jika tidak ada deteksi)
+#### `std_msgs/msg/Float32`
+Digunakan pada `/latency/control_serial`.
+
+```text
+float32 data
+```
+
+Pemaknaan di sistem ini:
+- `data`: latency (ms) dari error diterima di serial node sampai serial write
+
 
 #### `geometry_msgs/msg/Twist`
 Digunakan pada `/cmd_vel`.
@@ -136,24 +147,25 @@ int32 err_y
 float32 confidence
 ```
 
-Status: saat ini belum dipakai oleh node runtime (pipeline aktif memakai `geometry_msgs/msg/Vector3`).
+Status: saat ini belum dipakai oleh node runtime (pipeline aktif memakai `geometry_msgs/msg/Vector3Stamped`).
 
 ## 6) Flow Data Sistem
 
 ```mermaid
 flowchart LR
     CAM[Camera / OpenCV Capture] --> CV[camera_vision node]
-    CV -->|/vision/error\ngeometry_msgs/Vector3| PID[pid node]
+    CV -->|/vision/error\ngeometry_msgs/Vector3Stamped| PID[pid node]
     PID -->|/cmd_vel\ngeometry_msgs/Twist| SER[serial node]
     SER --> MCU[STM32 via UART]
     CV --> LOG["metrics_logger optional"]
     PID --> LOG
+    SER -->|/latency/control_serial\nstd_msgs/Float32| LOG
     LAT["/detection/latency optional"] --> LOG
 ```
 
 Penjelasan alur:
 1. `camera_vision` membaca frame, menjalankan YOLO `best.pt` untuk class `Human-body`, lalu menghitung error terhadap pusat frame.
-2. Error dipublish ke `/vision/error` sebagai `Vector3`.
+2. Error dipublish ke `/vision/error` sebagai `Vector3Stamped` dengan `header.stamp` saat capture.
 3. `pid` menerima error, melakukan pembalikan sumbu pan (`err_x` dibalik), kontrol PID + saturasi + rate limit, lalu publish `/cmd_vel`.
 4. `serial` menerima `/cmd_vel` dan mengirim string perintah format `P{pan},T{tilt}\n` ke mikrokontroler.
 5. (Opsional) `metrics_logger` mencatat `/vision/error`, `/cmd_vel`, dan latency ke CSV.
@@ -197,10 +209,10 @@ source install/setup.bash
 ros2 launch pan_tilt_controller pan_tilt.launch.py
 ```
 
-Aktifkan logger dan window debug:
+Override logger dan window debug:
 
 ```bash
-ros2 launch pan_tilt_controller pan_tilt.launch.py enable_logger:=true show_debug:=true
+ros2 launch pan_tilt_controller pan_tilt.launch.py enable_logger:=false show_debug:=false
 ```
 
 Pastikan file model `best.pt` tersedia di folder paket.
@@ -211,7 +223,7 @@ Cek cepat runtime:
 ros2 node list
 ros2 topic list
 ros2 topic info /vision/error
-ros2 interface show geometry_msgs/msg/Vector3
+ros2 interface show geometry_msgs/msg/Vector3Stamped
 ```
 
 ## 10) Catatan Implementasi Penting
@@ -225,3 +237,5 @@ ros2 interface show geometry_msgs/msg/Vector3
 - `deadzone` yang kecil membuat sistem lebih responsif tetapi bisa menambah jitter.
 - `control_rate` menentukan periode timer PID (dt = 1 / control_rate).
 - `metrics_logger` menulis CSV ke `output_dir` dan bisa merekam latency jika `latency_msg_type` diset.
+- Vision latency dihitung dari `header.stamp` pada `/vision/error` ke waktu publish saat diterima logger.
+- Control+serial latency dipublish oleh `serial` ke `/latency/control_serial` (ms).
