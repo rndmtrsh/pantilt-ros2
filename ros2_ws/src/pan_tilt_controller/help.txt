@@ -8,10 +8,12 @@ ros2 interface show -type
 
 colcon build --symlink-install
 
+cd /home/akmal/Documents/finalproject/ros2_ws
 colcon build --packages-select pan_tilt_controller --symlink-install
 source install/setup.bash
 ros2 launch pan_tilt_controller pan_tilt.launch.py
 
+rqt_grap
 
 ros2 run turtlesim turtlesim_node
 ros2 run turtlesim turtlesim_teleop
@@ -23,3 +25,7 @@ ros2 param set /pid Ki 0.8
 ros2 param set /pid Kd 1.1
 ros2 param set /pid max_vel 1500
 ros2 param set /pid rate_limit 300
+
+
+
+python3 src/pan_tilt_controller/scripts/analyze_metrics.py ../metrics_logs --output ../metrics_logs/summary.csv

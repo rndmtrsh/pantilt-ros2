@@ -32,58 +32,77 @@ def _extract_series(rows):
     err_x_values = []
     err_y_values = []
     conf_values = []
-    latency_values = []
-    latency_fallback_values = []
+    latency_total_values = []
+    control_values = []
+    serial_values = []
     capture_values = []
     publish_values = []
 
     for row in rows:
-        source = row.get('source') if has_source else 'vision'
+        if has_source:
+            source = row.get('source')
+            if source not in (None, '', 'vision'):
+                continue
 
-        if source == 'vision':
-            t_values.append(_to_float(row.get('t_sec')))
-            err_x_values.append(_to_float(row.get('err_x')))
-            err_y_values.append(_to_float(row.get('err_y')))
-            conf_values.append(_to_float(row.get('confidence')))
-            if 'capture_time_sec' in row:
-                capture_values.append(_to_float(row.get('capture_time_sec')))
-            if 'error_publish_time_sec' in row:
-                publish_values.append(_to_float(row.get('error_publish_time_sec')))
-            if 'latency_ms' in row:
-                latency_fallback_values.append(_to_float(row.get('latency_ms')))
-
-        if source == 'latency' and 'latency_ms' in row:
-            latency_values.append(_to_float(row.get('latency_ms')))
+        t_values.append(_to_float(row.get('t_sec')))
+        err_x_values.append(_to_float(row.get('err_x')))
+        err_y_values.append(_to_float(row.get('err_y')))
+        conf_values.append(_to_float(row.get('confidence')))
+        if 'latency_ms' in row:
+            latency_total_values.append(_to_float(row.get('latency_ms')))
+        if 'control_compute_ms' in row:
+            control_values.append(_to_float(row.get('control_compute_ms')))
+        if 'serial_write_ms' in row:
+            serial_values.append(_to_float(row.get('serial_write_ms')))
+        if 'capture_time_sec' in row:
+            capture_values.append(_to_float(row.get('capture_time_sec')))
+        if 'error_publish_time_sec' in row:
+            publish_values.append(_to_float(row.get('error_publish_time_sec')))
 
     t = np.array(t_values, dtype=float)
     err_x = np.array(err_x_values, dtype=float)
     err_y = np.array(err_y_values, dtype=float)
     conf = np.array(conf_values, dtype=float)
-    if latency_values:
-        latency = np.array(latency_values, dtype=float)
-    elif latency_fallback_values:
-        latency = np.array(latency_fallback_values, dtype=float)
-    else:
-        latency = None
+    latency_total = np.array(latency_total_values, dtype=float) if latency_total_values else None
+    control_compute = np.array(control_values, dtype=float) if control_values else None
+    serial_write = np.array(serial_values, dtype=float) if serial_values else None
     capture = np.array(capture_values, dtype=float) if capture_values else None
     publish = np.array(publish_values, dtype=float) if publish_values else None
 
-    return t, err_x, err_y, conf, latency, capture, publish
+    distance = rows[0].get('distance', '')
+    lighting = rows[0].get('light_condition', '')
+    test_id = rows[0].get('test_id', '')
+
+    return (
+        t,
+        err_x,
+        err_y,
+        conf,
+        latency_total,
+        control_compute,
+        serial_write,
+        capture,
+        publish,
+        distance,
+        lighting,
+        test_id,
+    )
 
 
-def _rms_error(t, err_x, err_y, steady_state_sec):
-    mask = np.isfinite(t) & np.isfinite(err_x) & np.isfinite(err_y) & (t <= steady_state_sec)
+def _rms_error(err_x, err_y):
+    mask = np.isfinite(err_x) & np.isfinite(err_y)
     if not np.any(mask):
         return math.nan
     err_mag = np.sqrt(err_x[mask] ** 2 + err_y[mask] ** 2)
     return float(np.sqrt(np.mean(err_mag ** 2)))
 
 
-def _mean_confidence(conf):
-    mask = np.isfinite(conf)
+def _mean_std(values):
+    mask = np.isfinite(values)
     if not np.any(mask):
-        return math.nan
-    return float(np.mean(conf[mask]))
+        return math.nan, math.nan
+    data = values[mask]
+    return float(np.mean(data)), float(np.std(data))
 
 
 def _loss_of_lock_per_minute(t, conf, threshold, min_duration):
@@ -121,83 +140,45 @@ def _loss_of_lock_per_minute(t, conf, threshold, min_duration):
     return float(events / (duration_sec / 60.0)), events
 
 
-def _settling_time(t, err_x, step_start, settle_band, hold_sec, final_window_sec, step_search_window_sec):
-    mask = np.isfinite(t) & np.isfinite(err_x)
-    t = t[mask]
-    err_x = err_x[mask]
-    if t.size < 3:
-        return math.nan
-
-    after_step_mask = t >= step_start
-    if not np.any(after_step_mask):
-        return math.nan
-
-    t_after = t[after_step_mask]
-    err_after = err_x[after_step_mask]
-    diffs = np.abs(np.diff(err_after))
-    if diffs.size == 0:
-        return math.nan
-
-    if step_search_window_sec > 0:
-        search_end = step_start + step_search_window_sec
-        search_mask = t_after[:-1] <= search_end
-        if np.any(search_mask):
-            search_diffs = diffs[search_mask]
-            step_offset = int(np.argmax(search_diffs))
-        else:
-            step_offset = int(np.argmax(diffs))
-    else:
-        step_offset = int(np.argmax(diffs))
-
-    step_time = t_after[min(step_offset + 1, t_after.size - 1)]
-
-    end_time = t[-1]
-    final_mask = t >= (end_time - final_window_sec)
-    if not np.any(final_mask):
-        return math.nan
-    final_value = float(np.median(err_x[final_mask]))
-
-    within = np.abs(err_x - final_value) <= settle_band
-    start_idx = int(np.searchsorted(t, step_time, side='left'))
-    idx = start_idx
-    while idx < t.size:
-        if within[idx]:
-            seg_start = t[idx]
-            idx_end = idx
-            while idx_end < t.size and within[idx_end]:
-                idx_end += 1
-            seg_end = t[idx_end - 1]
-            if seg_end - seg_start >= hold_sec:
-                return float(seg_start - step_time)
-            idx = idx_end
-        else:
-            idx += 1
-
-    return math.nan
-
-
-def _latency_stats(latency):
-    if latency is None:
-        return math.nan, math.nan
-
-    mask = np.isfinite(latency)
+def _median_iqr(values):
+    if values is None:
+        return math.nan, math.nan, math.nan
+    mask = np.isfinite(values)
     if not np.any(mask):
-        return math.nan, math.nan
+        return math.nan, math.nan, math.nan
+    data = values[mask]
+    q1 = float(np.percentile(data, 25))
+    median = float(np.percentile(data, 50))
+    q3 = float(np.percentile(data, 75))
+    return median, q1, q3
 
-    values = latency[mask]
-    return float(np.mean(values)), float(np.std(values))
 
-
-def _vision_latency_stats(capture, publish):
+def _vision_latency_ms(capture, publish):
     if capture is None or publish is None:
-        return math.nan, math.nan
-
+        return None
     mask = np.isfinite(capture) & np.isfinite(publish)
     if not np.any(mask):
-        return math.nan, math.nan
+        return None
+    return (publish[mask] - capture[mask]) * 1e3
 
-    latency_ms = (publish[mask] - capture[mask]) * 1e3
-    return float(np.mean(latency_ms)), float(np.std(latency_ms))
+
+def _format_mean_std(mean, std, precision=2):
+    if math.isnan(mean) or math.isnan(std):
+        return 'n/a'
+    return f'{mean:.{precision}f}+/-{std:.{precision}f}'
+
+
+def _format_median_iqr(median, q1, q3, unit='ms', precision=2):
+    if math.isnan(median) or math.isnan(q1) or math.isnan(q3):
+        return 'n/a'
+    return f'{median:.{precision}f} ({q1:.{precision}f}-{q3:.{precision}f}) {unit}'
+
+
+def _format_distance(value):
+    numeric = _to_float(value)
+    if math.isnan(numeric):
+        return str(value) if value is not None else ''
+    return f'{numeric:g} m'
 
 
 def analyze_file(csv_path, args):
@@ -206,49 +187,53 @@ def analyze_file(csv_path, args):
     if series is None:
         return None
 
-    t, err_x, err_y, conf, latency, capture, publish = series
-
-    rms_error = _rms_error(t, err_x, err_y, args.steady_state_sec)
-    settling_time = _settling_time(
+    (
         t,
         err_x,
-        args.step_start,
-        args.settle_band,
-        args.settle_hold,
-        args.final_window_sec,
-        args.step_search_window_sec,
-    )
-    mean_conf = _mean_confidence(conf)
-    loss_rate, loss_events = _loss_of_lock_per_minute(t, conf, args.lock_threshold, args.lock_min_duration)
-    latency_mean, latency_std = _latency_stats(latency)
-    vision_latency_mean, vision_latency_std = _vision_latency_stats(capture, publish)
+        err_y,
+        conf,
+        latency_total,
+        control_compute,
+        serial_write,
+        capture,
+        publish,
+        distance,
+        lighting,
+        test_id,
+    ) = series
+
+    rms_error = _rms_error(err_x, err_y)
+    mean_conf, std_conf = _mean_std(conf)
+    loss_rate, _ = _loss_of_lock_per_minute(t, conf, args.lock_threshold, args.lock_min_duration)
+
+    total_median, total_q1, total_q3 = _median_iqr(latency_total)
+    control_median, control_q1, control_q3 = _median_iqr(control_compute)
+    serial_median, serial_q1, serial_q3 = _median_iqr(serial_write)
+
+    vision_latency = _vision_latency_ms(capture, publish)
+    vision_median, vision_q1, vision_q3 = _median_iqr(vision_latency)
 
     return {
         'file': csv_path.name,
+        'distance': _format_distance(distance),
+        'lighting': lighting,
         'rms_error_px': rms_error,
-        'settling_time_sec': settling_time,
-        'mean_confidence': mean_conf,
+        'confidence': _format_mean_std(mean_conf, std_conf, precision=2),
         'loss_of_lock_per_min': loss_rate,
-        'loss_of_lock_events': loss_events,
-        'latency_mean_ms': latency_mean,
-        'latency_std_ms': latency_std,
-        'vision_latency_mean_ms': vision_latency_mean,
-        'vision_latency_std_ms': vision_latency_std,
+        'ros2_latency': _format_median_iqr(total_median, total_q1, total_q3, unit='ms', precision=2),
+        'vision_latency': _format_median_iqr(vision_median, vision_q1, vision_q3, unit='ms', precision=2),
+        'control_compute': _format_median_iqr(control_median, control_q1, control_q3, unit='ms', precision=2),
+        'serial_write': _format_median_iqr(serial_median, serial_q1, serial_q3, unit='ms', precision=2),
+        'test_id': test_id,
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze metrics CSV files.')
+    parser = argparse.ArgumentParser(description='Summarize metrics CSV files.')
     parser.add_argument('folder', type=Path, help='Folder containing metrics CSV files')
-    parser.add_argument('--steady-state-sec', type=float, default=60.0)
-    parser.add_argument('--step-start', type=float, default=60.0)
-    parser.add_argument('--step-search-window-sec', type=float, default=30.0)
-    parser.add_argument('--settle-band', type=float, default=10.0)
-    parser.add_argument('--settle-hold', type=float, default=1.0)
-    parser.add_argument('--final-window-sec', type=float, default=10.0)
     parser.add_argument('--lock-threshold', type=float, default=0.5)
     parser.add_argument('--lock-min-duration', type=float, default=0.5)
-    parser.add_argument('--output', type=Path, default=None)
+    parser.add_argument('--output', type=Path, default=None, help='Write the summary table to a CSV file')
     args = parser.parse_args()
 
     csv_files = sorted(args.folder.glob('*.csv'))
@@ -257,7 +242,10 @@ def main():
         return
 
     results = []
+    output_path = args.output.resolve() if args.output is not None else None
     for csv_path in csv_files:
+        if output_path is not None and csv_path.resolve() == output_path:
+            continue
         result = analyze_file(csv_path, args)
         if result is not None:
             results.append(result)
@@ -267,29 +255,40 @@ def main():
         return
 
     header = [
-        'file',
-        'rms_error_px',
-        'settling_time_sec',
-        'mean_confidence',
-        'loss_of_lock_per_min',
-        'loss_of_lock_events',
-        'latency_mean_ms',
-        'latency_std_ms',
-        'vision_latency_mean_ms',
-        'vision_latency_std_ms',
+        'Distance',
+        'Lighting',
+        'Pixel Error (RMS)',
+        'Confidence',
+        'Loss of Lock / minute',
+        'Latency (ROS2)',
+        'Latency (YOLO Vision)',
+        'control_compute',
+        'serial_write_time',
     ]
 
-    print(','.join(header))
+    print('Latency columns show median (IQR) in ms.')
+    print('\t'.join(header))
+    output_rows = [header]
     for result in results:
-        row = [result[key] for key in header]
-        print(','.join(str(value) for value in row))
+        row = [
+            result['distance'],
+            result['lighting'],
+            f"{result['rms_error_px']:.2f}" if math.isfinite(result['rms_error_px']) else 'n/a',
+            result['confidence'],
+            f"{result['loss_of_lock_per_min']:.2f}" if math.isfinite(result['loss_of_lock_per_min']) else 'n/a',
+            result['ros2_latency'],
+            result['vision_latency'],
+            result['control_compute'],
+            result['serial_write'],
+        ]
+        print('\t'.join(row))
+        output_rows.append(row)
 
     if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open('w', newline='') as handle:
             writer = csv.writer(handle)
-            writer.writerow(header)
-            for result in results:
-                writer.writerow([result[key] for key in header])
+            writer.writerows(output_rows)
 
 
 if __name__ == '__main__':

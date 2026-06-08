@@ -30,9 +30,10 @@ class SerialNode(Node):
         self.last_error_recv_time = None
 
         # Subscribers
-        self.error_sub = self.create_subscription(Vector3Stamped, '/vision/error', self._error_cb, 10)
+        self.error_sub = self.create_subscription(Vector3Stamped, '/vision_error', self._error_cb, 10)
         self.cmd_sub = self.create_subscription(Twist, '/cmd_vel', self.cmd_callback, 10)
         self.latency_pub = self.create_publisher(Float32, '/latency/control_serial', 10)
+        self.serial_write_pub = self.create_publisher(Float32, '/latency/serial_write', 10)
         self.get_logger().info('Serial node started')
 
     def _error_cb(self, msg):
@@ -47,9 +48,16 @@ class SerialNode(Node):
         self.get_logger().debug(f'Sending: {cmd_str.strip()}')
 
         try:
+            write_start = time.perf_counter()
             self.ser.write(cmd_str.encode())
+            write_ms = (time.perf_counter() - write_start) * 1e3
         except serial.SerialException as e:
             self.get_logger().error(f'Serial write error: {e}')
+            return
+
+        write_msg = Float32()
+        write_msg.data = float(write_ms)
+        self.serial_write_pub.publish(write_msg)
 
         if self.last_error_recv_time is not None:
             now = self.get_clock().now()
@@ -57,11 +65,6 @@ class SerialNode(Node):
             latency_msg = Float32()
             latency_msg.data = float(latency_ms)
             self.latency_pub.publish(latency_msg)
-
-        # Optionally read response (if STM32 replies)
-        # if self.ser.in_waiting > 0:
-        #     response = self.ser.readline().decode().strip()
-        #     self.get_logger().info(f'STM32 response: {response}')
 
     def destroy_node(self):
         if hasattr(self, 'ser') and self.ser.is_open:
