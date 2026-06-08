@@ -148,11 +148,20 @@ class CameraVisionNode(Node):
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
 
-                err_x_raw = cx - self.frame_center_x
-                err_y_raw = self.frame_center_y - cy
+                # Error relative to deadzone boundary (smooth correction)
+                if cx > self.frame_center_x + dead_x:
+                    err_x_raw = cx - (self.frame_center_x + dead_x)  # Positive: target right of deadzone
+                elif cx < self.frame_center_x - dead_x:
+                    err_x_raw = cx - (self.frame_center_x - dead_x)  # Negative: target left of deadzone
+                else:
+                    err_x_raw = 0
 
-                err_x_pub = err_x_raw if abs(err_x_raw) >= dead_x else 0
-                err_y_pub = err_y_raw if abs(err_y_raw) >= dead_y else 0
+                if cy < self.frame_center_y - dead_y:
+                    err_y_raw = (self.frame_center_y - dead_y) - cy  # Positive: target above deadzone
+                elif cy > self.frame_center_y + dead_y:
+                    err_y_raw = (self.frame_center_y + dead_y) - cy  # Negative: target below deadzone
+                else:
+                    err_y_raw = 0
 
                 if target_conf is not None and len(target_conf) > best_idx:
                     confidence = float(target_conf[best_idx])
@@ -161,11 +170,13 @@ class CameraVisionNode(Node):
 
                 self.last_detection = (x1, y1, x2, y2, cx, cy, confidence)
             else:
-                err_x_pub = 0
-                err_y_pub = 0
+                err_x_raw = 0
+                err_y_raw = 0
                 confidence = 0.0
                 self.last_detection = None
 
+            err_x_pub = err_x_raw
+            err_y_pub = err_y_raw
             self._last_err_x = err_x_pub
             self._last_err_y = err_y_pub
             self._last_conf = confidence
@@ -219,7 +230,7 @@ if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.shutdown_requested = True
                 self.timer.cancel()
 
-    def destroy_node(self):
+def destroy_node(self):
         self.timer.cancel()
         self.cap.release()
         if self.video_writer is not None:
