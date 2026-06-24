@@ -33,14 +33,20 @@ class CameraVisionNode(Node):
         self.declare_parameter('reacquire_timeout', 0.5)
         self.declare_parameter('vertical_ref_ratio', 0.33)
 
-        # Cache
+        # Cache parameters
+        self.camera_id = self.get_parameter('camera_id').value
         self.frame_width = self.get_parameter('frame_width').value
         self.frame_height = self.get_parameter('frame_height').value
-        self.deadzone = self.get_parameter('deadzone').value
+        self.deadzone_h = self.get_parameter('deadzone_h').value
+        self.deadzone_v = self.get_parameter('deadzone_v').value
         self.show_debug = self.get_parameter('show_debug').value
         self.flip_horizontal = self.get_parameter('flip_horizontal').value
         self.camera_backend = self.get_parameter('camera_backend').value
+        self.capture_rate = self.get_parameter('capture_rate').value
         self.inference_rate = self.get_parameter('inference_rate').value
+        self.max_jump = self.get_parameter('max_jump').value
+        self.reacquire_timeout = self.get_parameter('reacquire_timeout').value
+        self.vertical_ref_ratio = self.get_parameter('vertical_ref_ratio').value
 
         self.frame_center_x = self.frame_width // 2
         self.frame_center_y = self.frame_height // 2
@@ -50,6 +56,7 @@ class CameraVisionNode(Node):
         self.target_class_id = None
 
         self.error_pub = self.create_publisher(Vector3Stamped, '/vision_error', 10)
+        # Register callback once
         self.add_on_set_parameters_callback(self.parameter_callback)
 
         # Kamera
@@ -88,7 +95,6 @@ class CameraVisionNode(Node):
 
         # Timer
         self.timer = self.create_timer(1.0 / self.capture_rate, self.process_frame)
-        self.add_on_set_parameters_callback(self.parameter_callback)
         self.get_logger().info('Camera vision node started (separate H/V deadzones, improved jump filter)')
 
     def _open_camera(self):
@@ -112,7 +118,7 @@ class CameraVisionNode(Node):
 
         frame_h, frame_w = frame.shape[:2]
 
-        # Deadzone half-sizes in pixels
+        # Deadzone half-sizes in pixels (using current parameter values)
         dead_x = int(frame_w * self.deadzone_h / 2.0)
         dead_y = int(frame_h * self.deadzone_v / 2.0)
         center_x = frame_w // 2
@@ -125,7 +131,7 @@ class CameraVisionNode(Node):
             if elapsed < 1.0 / self.inference_rate:
                 run_inference = False
 
-        # Default: tahan error terakhir
+        # Default: hold last error
         err_x_pub = self._last_err_x
         err_y_pub = self._last_err_y
         confidence = self._last_conf
@@ -247,10 +253,22 @@ class CameraVisionNode(Node):
     def parameter_callback(self, params):
         from rcl_interfaces.msg import SetParametersResult
         for param in params:
-            if param.name in ('deadzone_h', 'deadzone_v', 'vertical_ref_ratio',
-                              'inference_rate', 'max_jump', 'reacquire_timeout',
-                              'show_debug', 'flip_horizontal'):
-                setattr(self, param.name, param.value)
+            if param.name == 'deadzone_h':
+                self.deadzone_h = param.value
+            elif param.name == 'deadzone_v':
+                self.deadzone_v = param.value
+            elif param.name == 'vertical_ref_ratio':
+                self.vertical_ref_ratio = param.value
+            elif param.name == 'inference_rate':
+                self.inference_rate = param.value
+            elif param.name == 'max_jump':
+                self.max_jump = param.value
+            elif param.name == 'reacquire_timeout':
+                self.reacquire_timeout = param.value
+            elif param.name == 'show_debug':
+                self.show_debug = param.value
+            elif param.name == 'flip_horizontal':
+                self.flip_horizontal = param.value
             elif param.name == 'capture_rate':
                 self.capture_rate = param.value
                 self.timer.cancel()
@@ -270,7 +288,7 @@ class CameraVisionNode(Node):
                 return None
         return None
 
-def destroy_node(self):
+    def destroy_node(self):
         self.timer.cancel()
         self.cap.release()
         if self.video_writer is not None:

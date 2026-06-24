@@ -13,7 +13,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'enable_logger',
-            default_value='true',
+            default_value='false',
             description='Enable metrics_logger node'
         ),
         DeclareLaunchArgument(
@@ -46,7 +46,7 @@ def generate_launch_description():
             executable='pid_node',
             name='pid',
             parameters=[{
-                'Kp': 0.7,
+                'Kp': 2.1,
                 'Ki': 0.8,
                 'Kd': 1.2,
                 'max_vel': 5000,
