@@ -13,23 +13,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'enable_logger',
-            default_value='false',
+            default_value='true',
             description='Enable metrics_logger node'
         ),
         DeclareLaunchArgument(
             'show_debug',
             default_value='true',          
             description='Show OpenCV GUI window'
-        ),
-        DeclareLaunchArgument(
-            'deadzone',
-            default_value='0.50',           # 50% dari dimensi frame
-            description='Rasio comfort zone (0=mati, 0.5=50% dari lebar/tinggi)'
-        ),
-        DeclareLaunchArgument(
-            'inference_rate',
-            default_value='10.0',           # Hz, YOLO hanya dijalankan 10x per detik
-            description='Batas frekuensi inferensi YOLO (Hz, 0=tidak terbatas)'
         ),
 
         Node(
@@ -40,8 +30,12 @@ def generate_launch_description():
                 'camera_id': 0,
                 'frame_width': 854,
                 'frame_height': 480,
-                'deadzone': LaunchConfiguration('deadzone'),
-                'inference_rate': LaunchConfiguration('inference_rate'),
+                'max_jump': 500,
+                'deadzone_h': 0.50,             # horizontal deadzone 
+                'deadzone_v': 0.40,             # vertical deadzone 
+                'capture_rate': 24.0,           # opencv rate
+                'inference_rate': 10.0,         # YOLO inference rate,
+                'vertical_ref_ratio': 0.33,
                 'show_debug': ParameterValue(show_debug, value_type=bool),
                 'flip_horizontal': True,
             }],
