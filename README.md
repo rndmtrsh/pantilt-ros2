@@ -36,26 +36,33 @@ Catatan:
 | Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
 |---|---|---|---|---|
 | `camera_id` | integer | `0` | `0` | Index kamera OpenCV |
-| `frame_width` | integer | `854` | `854` | Lebar frame |
-| `frame_height` | integer | `480` | `480` | Tinggi frame |
-| `deadzone` | float | `0.30` | `0.50` | Rasio comfort zone (0-1), error dihitung relatif ke batas deadzone |
-| `show_debug` | boolean | `False` | `true` | Tampilkan window debug OpenCV (bukan topic) |
+| `frame_width` | integer | `854` | `854` | Lebar frame (pixel) |
+| `frame_height` | integer | `480` | `480` | Tinggi frame (pixel) |
+| `deadzone_h` | float | `0.40` | `0.50` | Deadzone horizontal (rasio 0-1 dari frame width) |
+| `deadzone_v` | float | `0.40` | `0.40` | Deadzone vertikal (rasio 0-1 dari frame height) |
+| `show_debug` | boolean | `False` | `true` | Tampilkan window debug OpenCV |
 | `flip_horizontal` | boolean | `True` | `True` | Mirror frame horizontal |
-| `camera_backend` | string | `v4l2` | tidak di-set (pakai default) | Backend kamera OpenCV |
-| `inference_rate` | float | `10.0` | `10.0` | Frekuensi inferensi YOLO (Hz, 0=tidak terbatas) |
+| `camera_backend` | string | `v4l2` | (default) | Backend kamera OpenCV |
+| `capture_rate` | float | `30.0` | `24.0` | Frekuensi capture frame (Hz) |
+| `inference_rate` | float | `10.0` | `10.0` | Frekuensi inferensi YOLO (Hz) |
+| `max_jump` | integer | `200` | `500` | Threshold jarak maksimal jump filter (pixel) |
+| `reacquire_timeout` | float | `0.5` | `0.5` | Timeout untuk reacquire target (detik) |
+| `vertical_ref_ratio` | float | `0.33` | `0.33` | Posisi vertikal reference untuk ROI (rasio dari atas) |
 
-Catatan: model YOLO `best.pt` dibaca dari folder paket, dan target class `Human-body` bersifat hardcoded. Error dihitung relatif ke batas deadzone (bukan tengah frame) untuk pergerakan yang lebih halus.
+Catatan: model YOLO `best.pt` dibaca dari folder paket, target class `Human-body` bersifat hardcoded. Deadzone terpisah untuk horizontal dan vertikal memungkinkan kontrol yang lebih presisi. Jump filter mencegah deteksi melompat/flicker.
 
 ### 3.2 `/pid`
 
 | Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
 |---|---|---|---|---|
-| `Kp` | float | `0.5` | `0.7` | Gain proporsional |
+| `Kp` | float | `0.5` | `2.1` | Gain proporsional |
 | `Ki` | float | `0.01` | `0.8` | Gain integral |
 | `Kd` | float | `0.1` | `1.2` | Gain derivatif |
-| `max_vel` | float | `2000` | `5000` | Batas saturasi output |
+| `max_vel` | float | `2000` | `5000` | Batas saturasi output (unit: vu/detik dari mikrokontroler) |
 | `accel_limit` | float | `2500.0` | `1000.0` | Batas akselerasi (vel/detik) |
 | `control_rate` | float | `20` | `20` | Frekuensi loop kontrol (Hz) |
+
+Catatan: Launch file mendefinisikan parameter runtime aktual. Anti-windup diterapkan saat saturasi, integrator direset saat target hilang atau dalam deadzone.
 
 ### 3.3 `/serial`
 
@@ -68,16 +75,16 @@ Catatan: model YOLO `best.pt` dibaca dari folder paket, dan target class `Human-
 
 | Parameter | Tipe | Default (kode) | Default (launch) | Keterangan |
 |---|---|---|---|---|
-| `test_id` | string | `run` | `dist1p5_bright` | ID sesi untuk nama file |
-| `distance` | float | `0.0` | `1.5` | Jarak pengujian (meter) |
-| `light_condition` | string | `unknown` | `bright` | Kondisi cahaya |
+| `test_id` | string | `run` | `dist1p5_bright` | ID sesi untuk nama file CSV |
+| `distance` | float | `0.0` | `1.5` | Jarak pengujian (meter), dicatat di CSV |
+| `light_condition` | string | `unknown` | `bright` | Kondisi cahaya, dicatat di CSV |
 | `output_dir` | string | `~/metrics_logs` | `/home/akmal/Documents/finalproject/metrics_logs` | Folder output CSV |
-| `queue_size` | integer | `10000` | tidak di-set (pakai default) | Ukuran antrean internal |
-| `flush_interval_sec` | float | `0.5` | tidak di-set (pakai default) | Interval flush file |
-| `latency_topic` | string | `/detection/latency` | tidak di-set (pakai default) | Topic latency (legacy) |
-| `latency_total_topic` | string | `-` | `/latency/control_serial` | Topic latency total |
-| `latency_control_topic` | string | `-` | `/latency/control_compute` | Topic latency compute |
-| `latency_serial_topic` | string | `-` | `/latency/serial_write` | Topic latency serial write |
+| `flush_interval_sec` | float | `0.5` | (default) | Interval flush file CSV (detik) |
+| `latency_total_topic` | string | `/latency/control_serial` | `/latency/control_serial` | Topic latency error-to-serial |
+| `latency_control_topic` | string | `/latency/control_compute` | `/latency/control_compute` | Topic latency komputasi PID |
+| `latency_serial_topic` | string | `/latency/serial_write` | `/latency/serial_write` | Topic latency penulisan serial |
+
+Catatan: Nama file CSV otomatis dibuat dengan format `run_{test_id}_{timestamp}.csv`. Flush interval 0 atau negatif = flush setiap row (lebih lambat). Subscription ke topic latency bersifat kondisional (hanya jika parameter topic tidak kosong).
 
 ## 4) Topic List
 
@@ -233,20 +240,22 @@ ros2 interface show geometry_msgs/msg/Vector3Stamped
 ## 10) Catatan Implementasi Penting
 
 - Node vision memakai model YOLO `best.pt` dengan class target `Human-body` (hardcoded).
-- Node PID melakukan pembalikan arah pan (`err_x = -err_x_raw`) agar arah gerak sesuai mekanik.
-- Ketika `confidence` = `0.0`, node PID mengirim `pan_vel`/`tilt_vel` = `0.0`.
+- Deadzone terpisah untuk horizontal (`deadzone_h`) dan vertikal (`deadzone_v`) memungkinkan tuning presisi independen.
+- Jump filter dengan threshold `max_jump` mencegah deteksi melompat/flicker antar frame.
+- Node PID melakukan pembalikan arah pan (`err_x = -msg.vector.x`) agar arah gerak sesuai mekanik.
+- Ketika `confidence` = `0.0`, node PID mengirim `pan_vel`/`tilt_vel` = `0.0` dan me-reset semua state PID.
+- Ketika target dalam deadzone, integrator direset untuk mencegah windup.
 - `show_debug` hanya membuka window OpenCV lokal; tidak ada topic image.
 - Anti-windup sederhana diterapkan saat output menyentuh batas saturasi.
 - Parameter pada launch override default parameter di kode.
-- `deadzone` error dihitung relatif ke batas deadzone (bukan tengah frame), memberikan transisi yang lebih halus ketika target mendekat pusat.
 - `accel_limit` mengontrol batas akselerasi velocity (perubahan per detik). Nilai `0` menonaktifkan limit.
+- `capture_rate` menentukan frekuensi pembacaan frame (Hz), terpisah dari `inference_rate` YOLO.
+- `vertical_ref_ratio` mendefinisikan posisi vertikal reference untuk ROI (default 0.33 = 1/3 dari atas).
 - `metrics_logger` menulis CSV ke `output_dir` untuk topic latency yang dikonfigurasi.
 - Vision latency dihitung dari `header.stamp` pada `/vision_error` ke waktu publish saat diterima logger.
 - Control+serial latency dipublish oleh `serial` ke `/latency/control_serial` (ms).
+- Node PID, serial, dan logger memanggil parameter callback untuk hot-reload parameter (belum sepenuhnya terimplementasi untuk semua parameter).
 
-## 11) Code Review Graph
-
-Proyek ini menggunakan [code-review-graph](https://github.com/danielhanchen/code-review-graph) sebagai MCP (Model Context Protocol) server untuk analisis kode dan review otomatis. Konfigurasi tersedia di `.opencode.json`.
 
 ### Alur Data Visualization
 
