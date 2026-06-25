@@ -13,7 +13,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'enable_logger',
-            default_value='true',
+            default_value='false',
             description='Enable metrics_logger node'
         ),
         DeclareLaunchArgument(
@@ -70,8 +70,8 @@ def generate_launch_description():
             executable='metrics_logger',
             name='metrics_logger',
             parameters=[{
-                'test_id': 'dist1p5_bright',
-                'distance': 1.5,
+                'test_id': 'variable_bright()',
+                'distance': 4.0,
                 'light_condition': 'bright',
                 'output_dir': '/home/akmal/Documents/finalproject/metrics_logs',
                 'latency_total_topic': '/latency/control_serial',
