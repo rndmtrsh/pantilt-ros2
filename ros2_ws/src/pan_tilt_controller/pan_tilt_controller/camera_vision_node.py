@@ -8,17 +8,11 @@ import numpy as np
 from ultralytics import YOLO
 
 
-def _to_numpy(value):
-    if hasattr(value, 'detach'):
-        return value.detach().cpu().numpy()
-    return np.asarray(value)
-
-
 class CameraVisionNode(Node):
     def __init__(self):
         super().__init__('camera_vision_node')
 
-        # --- Parameters matching launch file ---
+        # --- Parameters  ---
         self.declare_parameter('camera_id', 0)
         self.declare_parameter('frame_width', 854)
         self.declare_parameter('frame_height', 480)
@@ -29,7 +23,7 @@ class CameraVisionNode(Node):
         self.declare_parameter('camera_backend', 'v4l2')
         self.declare_parameter('capture_rate', 30.0)
         self.declare_parameter('inference_rate', 10.0)
-        self.declare_parameter('max_jump', 200)            # increased from 80
+        self.declare_parameter('max_jump', 200)            
         self.declare_parameter('reacquire_timeout', 0.5)
         self.declare_parameter('vertical_ref_ratio', 0.33)
 
@@ -297,6 +291,7 @@ class CameraVisionNode(Node):
         super().destroy_node()
 
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = CameraVisionNode()
@@ -309,6 +304,11 @@ def main(args=None):
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+
+def _to_numpy(value):
+    if hasattr(value, 'detach'):
+        return value.detach().cpu().numpy()
+    return np.asarray(value) 
 
 
 if __name__ == '__main__':

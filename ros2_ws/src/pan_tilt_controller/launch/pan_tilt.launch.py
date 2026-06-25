@@ -13,7 +13,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'enable_logger',
-            default_value='false',
+            default_value='true',
             description='Enable metrics_logger node'
         ),
         DeclareLaunchArgument(
