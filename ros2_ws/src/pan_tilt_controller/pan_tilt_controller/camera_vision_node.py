@@ -29,7 +29,7 @@ class CameraVisionNode(Node):
         self.declare_parameter('vertical_ref_ratio', 0.33)
 
         # --- Video recording parameters ---
-        self.declare_parameter('record_video', False)
+        self.declare_parameter('record_video', False)   
         self.declare_parameter('video_output_dir', '~/metrics_logs')
         self.declare_parameter('video_fps', 24.0)
 

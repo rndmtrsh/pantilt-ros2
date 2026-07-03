@@ -38,6 +38,7 @@ def generate_launch_description():
                 'vertical_ref_ratio': 0.33,
                 'show_debug': ParameterValue(show_debug, value_type=bool),
                 'flip_horizontal': True,
+                'record_video': True,
             }],
             output='screen'
         ),
@@ -70,8 +71,8 @@ def generate_launch_description():
             executable='metrics_logger',
             name='metrics_logger',
             parameters=[{
-                'test_id': 'variable_bright()',
-                'distance': 4.0,
+                'test_id': '2hz_bright_part2',
+                'distance': 66.0,
                 'light_condition': 'bright',
                 'output_dir': '/home/akmal/Documents/finalproject/metrics_logs',
                 'latency_total_topic': '/latency/control_serial',

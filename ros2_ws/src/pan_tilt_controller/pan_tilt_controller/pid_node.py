@@ -43,12 +43,12 @@ class PIDNode(Node):
         self.error_sub = self.create_subscription(
             Vector3Stamped, '/vision_error', self.error_callback, 10)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.control_latency_pub = self.create_publisher(
-            Float32, '/latency/control_compute', 10)
 
         self.timer = self.create_timer(self.dt, self.control_loop)
         self.add_on_set_parameters_callback(self.parameter_callback)
 
+        self.control_latency_pub = self.create_publisher(
+            Float32, '/latency/control_compute', 10)
         self.get_logger().info(
             f'PID node started (accel_limit={self.accel_limit} vel/s, rate={control_rate}Hz)')
 
